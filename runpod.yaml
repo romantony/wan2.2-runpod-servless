@@ -1,0 +1,9 @@
+name: wan22-i2v-a14b-serverless
+gpu: "NVIDIA A10G"
+containerDiskGB: 40
+imageName: "<YOUR_REGISTRY>/wan22-runpod-serverless:latest"
+env:
+  - key: WAN_CKPT_DIR
+    value: "/workspace/models"
+  - key: RUNPOD_MAX_CONCURRENCY
+    value: "1"
