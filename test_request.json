@@ -1,0 +1,16 @@
+{
+  "action": "request",
+  "return_video": false,
+  "inputs": {
+    "reference_image_url": "https://example.com/sample.jpg",
+    "prompt": "A cinematic slow pan across the subject, dreamy lighting",
+    "size": "1280*720",
+    "seed": 12345,
+    "num_frames": 49,
+    "sample_solver": "unipc",
+    "sample_steps": 24,
+    "cfg_scale": 6.0,
+    "offload_model": true,
+    "t5_cpu": true
+  }
+}
