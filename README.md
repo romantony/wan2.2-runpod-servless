@@ -36,7 +36,8 @@ docker build -t <YOUR_REGISTRY>/wan22-runpod-serverless:latest .
 docker push <YOUR_REGISTRY>/wan22-runpod-serverless:latest
 ```
 Create a RunPod Serverless template using the image. Set env:
-- `WAN_CKPT_DIR`: `/workspace/models` (default)
+- `WAN_CKPT_DIR`: `/runpod-volume/Wan2.2` (or `/workspace/models`)
+- `HF_TOKEN`: Your Hugging Face token for auto-downloads
 - `RUNPOD_MAX_CONCURRENCY`: `1`
 - `COMFYUI_ROOT`: `/workspace/ComfyUI`
 - `COMFYUI_MODELS_DIR`: `/workspace/ComfyUI/models`
@@ -93,8 +94,35 @@ At startup, the bootstrap script links `COMFYUI_MODELS_DIR` to the first matchin
 Outputs save to `/workspace/outputs/<request_id>.mp4` (and can be returned as base64 when `return_video=true`).
 
 ### Tasks
-- `i2v-A14B` (default): image-to-video (requires `reference_image_*`)
-- `s2v-*`: source/animate-to-video (no image required; provide source path and related args as supported by Wan2.2)
+- `t2v-A14B`: text-to-video (requires only `prompt`)
+- `i2v-A14B`: image-to-video (requires `reference_image_*` + `prompt`)
+- `s2v-14B`: speech-to-video (requires `audio` + `image` + `prompt`)
+- `ti2v-5B`: text/image-to-video hybrid (optional `image`)
+
+## Testing
+
+### Text-to-Video (T2V)
+```bash
+python scripts/test_t2v_endpoint.py \
+  --api-url https://api.runpod.ai/v2/YOUR_ENDPOINT_ID/run \
+  --api-key YOUR_API_KEY \
+  --prompt "Two anthropomorphic cats in boxing gear fighting on a stage" \
+  --frames 49 \
+  --steps 24 \
+  --cfg 6.0
+```
+
+### Image-to-Video (I2V)
+```bash
+python scripts/test_endpoint.py \
+  --api-url https://api.runpod.ai/v2/YOUR_ENDPOINT_ID/run \
+  --api-key YOUR_API_KEY \
+  --image-url https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e?w=1024 \
+  --prompt "cinematic slow pan" \
+  --frames 49 \
+  --steps 24 \
+  --cfg 6.0
+```
 
 ## Parameters
 These inputs are forwarded to Wan2.2’s `generate.py` (aligned to the upstream CLI). Defaults shown are from the wrapper or upstream where noted; ranges are recommended, not strict.
