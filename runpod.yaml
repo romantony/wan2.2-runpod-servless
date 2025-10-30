@@ -7,3 +7,7 @@ env:
     value: "/workspace/models"
   - key: RUNPOD_MAX_CONCURRENCY
     value: "1"
+  - key: COMFYUI_ROOT
+    value: "/workspace/ComfyUI"
+  - key: COMFYUI_MODELS_DIR
+    value: "/workspace/ComfyUI/models"

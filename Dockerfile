@@ -3,7 +3,9 @@ ENV DEBIAN_FRONTEND=noninteractive \
     PIP_NO_CACHE_DIR=1 \
     PYTHONUNBUFFERED=1 \
     WAN_HOME=/workspace/Wan2.2 \
-    WAN_CKPT_DIR=/workspace/models
+    WAN_CKPT_DIR=/workspace/models \
+    COMFYUI_ROOT=/workspace/ComfyUI \
+    COMFYUI_MODELS_DIR=/workspace/ComfyUI/models
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git git-lfs python3 python3-pip python3-venv curl wget ca-certificates tini ffmpeg \
@@ -14,7 +16,14 @@ RUN python3 -m pip install --upgrade pip && \
         torch torchvision torchaudio
 
 WORKDIR /workspace
-RUN git clone https://github.com/Wan-Video/Wan2.2.git && cd Wan2.2 && pip install -r requirements.txt || true
+# Wan2.2 (video) – i2v/s2v CLI
+RUN git clone https://github.com/Wan-Video/Wan2.2.git && \
+    cd Wan2.2 && \
+    pip install -r requirements.txt || true
+
+# ComfyUI (for image pipelines like FLUX dev)
+RUN git clone --depth 1 https://github.com/comfyanonymous/ComfyUI.git ${COMFYUI_ROOT} && \
+    python3 -m pip install -r ${COMFYUI_ROOT}/requirements.txt || true
 
 COPY requirements.txt /workspace/requirements.txt
 RUN pip install -r /workspace/requirements.txt

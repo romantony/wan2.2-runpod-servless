@@ -2,6 +2,8 @@ import os, io, json, time, base64, shutil, subprocess, uuid, requests, runpod, t
 
 WAN_HOME = os.environ.get("WAN_HOME","/workspace/Wan2.2")
 WAN_CKPT_DIR = os.environ.get("WAN_CKPT_DIR","/workspace/models")
+COMFYUI_ROOT = os.environ.get("COMFYUI_ROOT","/workspace/ComfyUI")
+COMFYUI_MODELS_DIR = os.environ.get("COMFYUI_MODELS_DIR","/workspace/ComfyUI/models")
 # Be tolerant to common RunPod Serverless mount path defaults
 if not os.path.isdir(WAN_CKPT_DIR) and os.path.isdir("/runpod-volume"):
     WAN_CKPT_DIR = "/runpod-volume"
@@ -33,6 +35,8 @@ def _download_ref_image(inputs):
     return None
 
 def _build_cmd(args, image_path):
+    # Support selecting WAN task: default i2v-A14B; allow s2v-* from request
+    task = str(args.get("task", "i2v-A14B")).strip() or "i2v-A14B"
     size = args.get("size","1280*720")
     prompt = args.get("prompt","")
     seed = str(args.get("seed","")) if args.get("seed") is not None else ""
@@ -41,12 +45,14 @@ def _build_cmd(args, image_path):
 
     cmd = [
         "python3", f"{WAN_HOME}/generate.py",
-        "--task", "i2v-A14B",
+        "--task", task,
         "--size", size,
         "--ckpt_dir", WAN_CKPT_DIR,
-        "--image", image_path,
         "--offload_model", offload,
     ]
+    # Only pass image flag for i2v tasks
+    if task.lower().startswith("i2v") and image_path:
+        cmd += ["--image", image_path]
 
     # Optional: dtype conversion to optimize VRAM
     if str(args.get("convert_model_dtype", True)).lower() in ("1","true","yes"):
@@ -229,8 +235,12 @@ JOBS = {}
 def handle_request(event):
     rid = str(uuid.uuid4())
     params = event.get("params") or event.get("inputs") or {}
-    img = _download_ref_image(params)
-    if not img: return {"error":"Missing reference image (url/base64/path)."}
+    task = str(params.get("task","i2v-A14B")).strip() or "i2v-A14B"
+    img = None
+    if task.lower().startswith("i2v"):
+        img = _download_ref_image(params)
+        if not img:
+            return {"error":"Missing reference image (url/base64/path) for i2v task."}
     JOBS[rid] = {"status":"RUNNING","started":time.time()}
     _progress(5, "Starting generation...")
     # Prefer directing WAN to save into our outputs dir
