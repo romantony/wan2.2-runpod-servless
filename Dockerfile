@@ -9,7 +9,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
     TINI_SUBREAPER=1
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    git git-lfs python3 python3-pip python3-venv curl wget ca-certificates tini ffmpeg libsndfile1 \
+    git git-lfs python3 python3-pip python3-venv python3-dev curl wget ca-certificates tini ffmpeg libsndfile1 \
     build-essential cmake ninja-build \
  && rm -rf /var/lib/apt/lists/*
 
