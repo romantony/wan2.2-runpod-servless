@@ -1,7 +1,13 @@
 FROM nvidia/cuda:12.4.1-cudnn9-runtime-ubuntu22.04
-ENV DEBIAN_FRONTEND=noninteractive PIP_NO_CACHE_DIR=1 PYTHONUNBUFFERED=1 \    WAN_HOME=/workspace/Wan2.2 WAN_CKPT_DIR=/workspace/models
+ENV DEBIAN_FRONTEND=noninteractive \
+    PIP_NO_CACHE_DIR=1 \
+    PYTHONUNBUFFERED=1 \
+    WAN_HOME=/workspace/Wan2.2 \
+    WAN_CKPT_DIR=/workspace/models
 
-RUN apt-get update && apt-get install -y --no-install-recommends \    git git-lfs python3 python3-pip python3-venv curl wget ca-certificates tini ffmpeg \    && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git git-lfs python3 python3-pip python3-venv curl wget ca-certificates tini ffmpeg \
+ && rm -rf /var/lib/apt/lists/*
 
 RUN python3 -m pip install --upgrade pip && \
     pip install --extra-index-url https://download.pytorch.org/whl/cu124 \
