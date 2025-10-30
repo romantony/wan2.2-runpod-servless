@@ -289,7 +289,18 @@ def handle_status(event):
             res["result"] = {"filename":os.path.basename(p),"data":"data:video/mp4;base64,"+b64}
     return res
 
+def _normalize_event(event):
+    try:
+        if isinstance(event, dict) and isinstance(event.get("input"), dict):
+            return event["input"]
+    except Exception:
+        pass
+    return event or {}
+
+
 def handler(event):
+    # Unwrap RunPod job wrapper shape: { id, input: { ... } }
+    event = _normalize_event(event)
     if event.get("health"):
         ok = os.path.isdir(WAN_HOME) and os.path.isdir(WAN_CKPT_DIR)
         return {"ok": ok, "wan_home": WAN_HOME, "ckpt_dir": WAN_CKPT_DIR}
