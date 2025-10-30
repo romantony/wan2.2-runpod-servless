@@ -6,6 +6,30 @@ This image installs both:
 
 It uses your pre-downloaded models from persistent storage. Mount your RunPod volume so the container sees the weights and avoids network downloads.
 
+## Model Setup
+
+### Option 1: Auto-Download on First Run (Recommended)
+The bootstrap script will automatically download the WAN 2.2 I2V-A14B model from Hugging Face if not found.
+
+**Set the `HF_TOKEN` environment variable in your RunPod template:**
+```
+HF_TOKEN=hf_your_huggingface_token_here
+```
+
+Get your token from: https://huggingface.co/settings/tokens
+
+The model will be downloaded to `${WAN_CKPT_DIR}/Wan2.2-I2V-A14B` on the first worker startup.
+
+### Option 2: Pre-Download Models
+If you prefer to pre-download models to your persistent storage:
+
+```bash
+pip install "huggingface_hub[cli]"
+huggingface-cli download Wan-AI/Wan2.2-I2V-A14B --local-dir /runpod-volume/models/Wan2.2-I2V-A14B --local-dir-use-symlinks False
+```
+
+Ensure the model directory contains `models_t5_umt5-xxl-enc-bf16.pth` and other checkpoint files.
+
 ## Build & Deploy
 ```bash
 docker build -t <YOUR_REGISTRY>/wan22-runpod-serverless:latest .
