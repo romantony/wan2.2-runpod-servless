@@ -1,5 +1,5 @@
 name: wan22-i2v-a14b-serverless
-gpu: "NVIDIA A10G"
+gpu: "NVIDIA RTX 5090"
 containerDiskGB: 40
 imageName: "<YOUR_REGISTRY>/wan22-runpod-serverless:latest"
 env:
