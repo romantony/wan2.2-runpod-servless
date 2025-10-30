@@ -55,5 +55,5 @@ dashscope>=1.14.0
 pandas>=2.0.0
 loguru>=0.7.0
 tokenizers>=0.20.0
-flash-attn>=2.3.0
+# flash-attn is installed separately in the Dockerfile (requires torch present during build)
 

@@ -10,11 +10,16 @@ ENV DEBIAN_FRONTEND=noninteractive \
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git git-lfs python3 python3-pip python3-venv curl wget ca-certificates tini ffmpeg libsndfile1 \
+    build-essential cmake ninja-build \
  && rm -rf /var/lib/apt/lists/*
 
 RUN python3 -m pip install --upgrade pip && \
     pip install --index-url https://download.pytorch.org/whl/cu128 \
         torch torchvision torchaudio
+
+# Install flash-attn after torch so torch is available in the build environment
+# Use --no-build-isolation so the build can see the already-installed torch package.
+RUN PIP_NO_BUILD_ISOLATION=1 pip install --no-build-isolation flash-attn==2.8.3 || PIP_NO_BUILD_ISOLATION=1 pip install --no-build-isolation flash-attn || true
 
 WORKDIR /workspace
 # Wan2.2 (video) – i2v/s2v CLI
