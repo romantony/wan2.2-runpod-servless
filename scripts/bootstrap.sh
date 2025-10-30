@@ -59,4 +59,6 @@ fi
 echo "[bootstrap] ComfyUI root: ${COMFYUI_ROOT}"
 echo "[bootstrap] ComfyUI models: ${COMFYUI_MODELS_DIR}"
 
-python3 -m runpod
+# Start RunPod serverless worker directly (avoid python -m runpod)
+export PYTHONPATH="/workspace:${PYTHONPATH:-}"
+exec python3 /workspace/src/handler.py

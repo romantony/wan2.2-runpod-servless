@@ -5,7 +5,8 @@ ENV DEBIAN_FRONTEND=noninteractive \
     WAN_HOME=/workspace/Wan2.2 \
     WAN_CKPT_DIR=/workspace/models \
     COMFYUI_ROOT=/workspace/ComfyUI \
-    COMFYUI_MODELS_DIR=/workspace/ComfyUI/models
+    COMFYUI_MODELS_DIR=/workspace/ComfyUI/models \
+    TINI_SUBREAPER=1
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git git-lfs python3 python3-pip python3-venv curl wget ca-certificates tini ffmpeg \
@@ -34,5 +35,5 @@ RUN chmod +x /workspace/scripts/bootstrap.sh
 
 ENV RUNPOD_MAX_CONCURRENCY=1
 
-ENTRYPOINT ["/usr/bin/tini","--"]
+ENTRYPOINT ["/usr/bin/tini","-s","--"]
 CMD ["/bin/bash","/workspace/scripts/bootstrap.sh"]
