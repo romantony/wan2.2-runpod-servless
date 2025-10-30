@@ -17,6 +17,13 @@ Create a RunPod Serverless template using the image. Set env:
 - `COMFYUI_ROOT`: `/workspace/ComfyUI`
 - `COMFYUI_MODELS_DIR`: `/workspace/ComfyUI/models`
 
+**Mount your RunPod permanent storage volume (ID: p63c2g0961) to `/runpod-volume`**
+
+Your models are stored in: `/runpod-volume/models/` with the following structure:
+- **WAN Image-to-Video models** (i2v-A14B)
+- **WAN Speech-to-Video models** (s2v-*)
+- **FLUX.1-dev models** (for ComfyUI)
+
 Mount your RunPod permanent storage and ensure your models are placed in one of these locations:
 
 - Wan2.2 weights:

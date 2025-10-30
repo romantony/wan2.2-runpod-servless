@@ -2,6 +2,8 @@ name: wan22-i2v-a14b-serverless
 gpu: "NVIDIA RTX 5090"
 containerDiskGB: 40
 imageName: "<YOUR_REGISTRY>/wan22-runpod-serverless:latest"
+# Mount permanent storage volume: p63c2g0961 to /runpod-volume
+# Contains: WAN i2v/s2v models + FLUX.1-dev in /runpod-volume/models/
 env:
   - key: WAN_CKPT_DIR
     value: "/workspace/models"
