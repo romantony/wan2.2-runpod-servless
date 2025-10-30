@@ -2,3 +2,4 @@ scripts/test_endpoint.py
 outputs/
 tmp/
 *.mp4
+scripts/test_endpoint.py

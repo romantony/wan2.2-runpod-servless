@@ -58,7 +58,11 @@ def run_job(
         data=json.dumps(payload),
         timeout=300,
     )
-    r.raise_for_status()
+    try:
+        r.raise_for_status()
+    except requests.HTTPError as e:
+        detail = r.text[:800] if r is not None else str(e)
+        raise RuntimeError(f"Run request failed ({r.status_code}): {detail}") from e
     data = r.json()
     job_id = data.get("id") or data.get("jobId")
     if not job_id:
@@ -85,7 +89,11 @@ def poll_status(base_or_run_url: str, api_key: str, job_id: str, interval_s: flo
                 headers={"Authorization": f"Bearer {api_key}"},
                 timeout=60,
             )
-        r.raise_for_status()
+        try:
+            r.raise_for_status()
+        except requests.HTTPError as e:
+            detail = r.text[:800] if r is not None else str(e)
+            raise RuntimeError(f"Status request failed ({r.status_code}): {detail}") from e
         s = r.json()
         status = s.get("status") or s.get("state")
         if status and status != last_status:
@@ -188,6 +196,8 @@ def main():
     if not api_url or not args.api_key:
         print("ERROR: Provide --api-url/--endpoint-id and --api-key or set RUNPOD_API_URL/RUNPOD_ENDPOINT_ID and RUNPOD_API_KEY.", file=sys.stderr)
         sys.exit(2)
+    # Trim accidental whitespace/newlines in API key
+    args.api_key = args.api_key.strip()
 
     job_id = run_job(
         base_or_run_url=api_url,
