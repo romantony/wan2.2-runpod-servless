@@ -18,22 +18,6 @@ def _b64_to_bytes(data_uri: str) -> bytes:
     return base64.b64decode(data_uri)
 
 
-def run_health(base_or_run_url: str, api_key: str) -> dict:
-    base_url, run_url, _ = normalize_urls(base_or_run_url)
-    payload = {"input": {"health": True}}
-    r = requests.post(
-        run_url,
-        headers={
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json",
-        },
-        data=json.dumps(payload),
-        timeout=60,
-    )
-    r.raise_for_status()
-    return r.json()
-
-
 def run_job(
     base_or_run_url: str,
     api_key: str,
@@ -163,7 +147,7 @@ def normalize_urls(api_url_or_base: str) -> Tuple[str, str, str]:
 def main():
     DEFAULT_ENDPOINT_ID = "c5tcnbrax0chts"
     DEFAULT_API_BASE = f"https://api.runpod.ai/v2/{DEFAULT_ENDPOINT_ID}"
-    p = argparse.ArgumentParser(description="Test RunPod Serverless WAN 2.2 endpoint and save MP4.")
+    p = argparse.ArgumentParser(description="Run generation on a RunPod Serverless WAN 2.2 endpoint and save MP4.")
     p.add_argument(
         "--api-url",
         default=os.getenv("RUNPOD_API_URL", DEFAULT_API_BASE),
@@ -194,9 +178,6 @@ def main():
     p.add_argument("--t5-cpu", action="store_true")
     p.add_argument("--t5-gpu", dest="t5_cpu", action="store_false")
     p.set_defaults(t5_cpu=True)
-    p.add_argument("--health-only", action="store_true", help="Run only a health check and exit")
-    p.add_argument("--skip-health", action="store_true", help="Skip health check and run generation directly")
-    p.add_argument("--ignore-health-fail", action="store_true", help="Proceed to generation even if health fails")
     args = p.parse_args()
 
     # Prefer explicit API URL; otherwise build from endpoint-id
@@ -207,25 +188,6 @@ def main():
     if not api_url or not args.api_key:
         print("ERROR: Provide --api-url/--endpoint-id and --api-key or set RUNPOD_API_URL/RUNPOD_ENDPOINT_ID and RUNPOD_API_KEY.", file=sys.stderr)
         sys.exit(2)
-
-    # Health-first flow (default): run health, then generation unless --health-only or --skip-health specified
-    if not args.skip_health:
-        try:
-            data = run_health(api_url, args.api_key)
-            print("Health:")
-            print(json.dumps(data, indent=2))
-            ok = bool(data.get("output", {}).get("ok")) or bool(data.get("ok"))
-            if args.health_only:
-                sys.exit(0)
-            if not ok and not args.ignore_health_fail:
-                print("Health check failed (ok=false). Use --ignore-health-fail to proceed anyway.", file=sys.stderr)
-                sys.exit(1)
-        except Exception as e:
-            if args.health_only:
-                raise
-            if not args.ignore_health_fail:
-                print(f"Health check error: {e}", file=sys.stderr)
-                sys.exit(1)
 
     job_id = run_job(
         base_or_run_url=api_url,
