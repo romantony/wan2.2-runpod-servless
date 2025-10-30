@@ -13,3 +13,5 @@ einops>=0.7.0
 omegaconf>=2.3.0
 timm>=1.0.8
 imageio-ffmpeg>=0.4.9
+ftfy>=6.2.0
+sentencepiece>=0.1.99
