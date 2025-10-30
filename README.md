@@ -14,10 +14,10 @@ Create a RunPod Serverless template using the image. Set env:
 **Mount your RunPod permanent storage** to `/workspace/models` so weights survive cold starts.
 
 ## GPU/CUDA Compatibility
-- Base image: CUDA 12.4.1 + cuDNN (Ubuntu 22.04)
-- PyTorch stack: 2.5.1 cu124 (torch 2.5.1, torchvision 0.20.1, torchaudio 2.5.1)
+- Base image: CUDA 12.8.0 + cuDNN (Ubuntu 22.04)
+- PyTorch stack: cu128 wheels (latest available for torch/vision/audio)
 - Target GPUs: RTX 5090 (default in runpod.yaml), RTX 4090, A100.
-- If you see device/driver mismatches, ensure the host drivers support CUDA 12.4 or upgrade host drivers accordingly.
+- If you see device/driver mismatches, ensure host drivers support CUDA 12.8. If necessary, rebuild after upgrading drivers.
 
 ## API
 ### Request
