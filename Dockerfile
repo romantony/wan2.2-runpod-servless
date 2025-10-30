@@ -1,4 +1,5 @@
 FROM nvidia/cuda:12.8.0-cudnn-runtime-ubuntu22.04
+# Build: 2025-10-30 - Auto-download WAN models + python3-dev fix
 ENV DEBIAN_FRONTEND=noninteractive \
     PIP_NO_CACHE_DIR=1 \
     PYTHONUNBUFFERED=1 \
