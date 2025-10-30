@@ -140,8 +140,13 @@ def extract_and_save_output(status_payload: dict, out_dir: str = "outputs") -> O
 
 
 def main():
+    DEFAULT_ENDPOINT_ID = "c5tcnbrax0chts"
     p = argparse.ArgumentParser(description="Test RunPod Serverless WAN 2.2 endpoint and save MP4.")
-    p.add_argument("--endpoint-id", default=os.getenv("RUNPOD_ENDPOINT_ID"), help="RunPod endpoint ID (v2)")
+    p.add_argument(
+        "--endpoint-id",
+        default=os.getenv("RUNPOD_ENDPOINT_ID", DEFAULT_ENDPOINT_ID),
+        help=f"RunPod endpoint ID (v2). Defaults to env RUNPOD_ENDPOINT_ID or '{DEFAULT_ENDPOINT_ID}'.",
+    )
     p.add_argument("--api-key", default=os.getenv("RUNPOD_API_KEY"), help="RunPod API key (Bearer)")
     p.add_argument("--image-url", default="https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e?w=1024")
     p.add_argument("--prompt", default="A cinematic slow pan, dreamy lighting")
@@ -196,4 +201,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
