@@ -1,5 +1,5 @@
 FROM nvidia/cuda:12.8.0-cudnn-runtime-ubuntu22.04
-# Build: 2025-10-30 - Auto-download WAN models + python3-dev fix
+# Build: 2025-10-31 - Fix flash-attn for RTX 5090
 ENV DEBIAN_FRONTEND=noninteractive \
     PIP_NO_CACHE_DIR=1 \
     PYTHONUNBUFFERED=1 \
@@ -18,9 +18,10 @@ RUN python3 -m pip install --upgrade pip && \
     pip install --index-url https://download.pytorch.org/whl/cu128 \
         torch torchvision torchaudio
 
-# Install flash-attn after torch so torch is available in the build environment
-# Use --no-build-isolation so the build can see the already-installed torch package.
-RUN PIP_NO_BUILD_ISOLATION=1 pip install --no-build-isolation flash-attn==2.8.3 || PIP_NO_BUILD_ISOLATION=1 pip install --no-build-isolation flash-attn || true
+# Install flash-attn properly - critical for WAN 2.2
+# Try prebuilt wheel first, then compile from source if needed
+RUN pip install flash-attn --no-build-isolation || \
+    (pip install packaging && pip install flash-attn --no-build-isolation)
 
 WORKDIR /workspace
 # Wan2.2 (video) – i2v/s2v CLI
