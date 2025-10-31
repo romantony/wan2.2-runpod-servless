@@ -18,16 +18,20 @@ RUN python3 -m pip install --upgrade pip && \
     pip install --index-url https://download.pytorch.org/whl/cu128 \
         torch torchvision torchaudio
 
-# Install flash-attn properly - critical for WAN 2.2
-# Try prebuilt wheel first, then compile from source if needed
-RUN pip install flash-attn --no-build-isolation || \
-    (pip install packaging && pip install flash-attn --no-build-isolation)
+# Try to install flash-attn (prebuilt wheel preferred)
+# If it fails, continue - we'll patch WAN code to handle missing flash-attn
+RUN pip install flash-attn --no-build-isolation || echo "Flash-attn not available, will use PyTorch fallback"
 
 WORKDIR /workspace
 # Wan2.2 (video) – i2v/s2v CLI
 RUN git clone https://github.com/Wan-Video/Wan2.2.git && \
     cd Wan2.2 && \
     pip install -r requirements.txt || true
+
+# Copy patch script and apply it
+COPY scripts/patch_wan_flashattn.sh /workspace/scripts/
+RUN chmod +x /workspace/scripts/patch_wan_flashattn.sh && \
+    /workspace/scripts/patch_wan_flashattn.sh
 
 # ComfyUI (for image pipelines like FLUX dev)
 RUN git clone --depth 1 https://github.com/comfyanonymous/ComfyUI.git ${COMFYUI_ROOT} && \
