@@ -14,7 +14,7 @@ def main():
     parser.add_argument('--api-url', required=True, help='RunPod API endpoint URL')
     parser.add_argument('--api-key', required=True, help='RunPod API key')
     parser.add_argument('--prompt', required=True, help='Text prompt for video generation')
-    parser.add_argument('--size', default='832*480', help='Video size (default: 832*480)')
+    parser.add_argument('--size', default='1280*704', help='Video size (default: 1280*704, also supports 704*1280)')
     parser.add_argument('--frames', type=int, default=25, help='Number of frames (default: 25)')
     parser.add_argument('--steps', type=int, default=20, help='Sampling steps (default: 20)')
     parser.add_argument('--cfg', type=float, default=6.0, help='CFG scale (default: 6.0)')
@@ -48,6 +48,7 @@ def main():
     print(f"Submitting TI2V-5B job (5 Billion Parameter Model)")
     print(f"  Prompt: {args.prompt}")
     print(f"  Size: {args.size}, Frames: {args.frames}, Steps: {args.steps}, CFG: {args.cfg}")
+    print(f"  Note: TI2V-5B only supports 1280*704 or 704*1280")
     
     # Submit job
     response = requests.post(args.api_url, headers=headers, json=payload)
