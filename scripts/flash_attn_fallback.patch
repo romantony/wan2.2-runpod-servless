@@ -1,0 +1,20 @@
+--- a/wan/modules/attention.py
++++ b/wan/modules/attention.py
+@@ -109,7 +109,16 @@ def flash_attention(
+         else:
+             pass
+ 
+-    assert FLASH_ATTN_2_AVAILABLE
++    # Fallback if flash-attn not available
++    if not FLASH_ATTN_2_AVAILABLE:
++        import torch.nn.functional as F
++        # Use PyTorch native attention as fallback
++        q_t = q.transpose(1, 2)  # [B, H, N, D]
++        k_t = k.transpose(1, 2)
++        v_t = v.transpose(1, 2)
++        out = F.scaled_dot_product_attention(q_t, k_t, v_t, attn_mask=None, dropout_p=0.0)
++        return out.transpose(1, 2).contiguous()
++    # assert FLASH_ATTN_2_AVAILABLE - commented out, using fallback instead
+ 
+     if FLASH_ATTN_3_AVAILABLE:
+         return flash_attn_func(
