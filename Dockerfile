@@ -1,5 +1,5 @@
-FROM nvidia/cuda:12.8.0-cudnn-runtime-ubuntu22.04
-# Build: 2025-10-31 - Fix flash-attn for RTX 5090
+FROM nvidia/cuda:12.8.0-cudnn-devel-ubuntu22.04
+# Build: 2025-10-31 - Use devel image for flash-attn compilation, make it optional
 ENV DEBIAN_FRONTEND=noninteractive \
     PIP_NO_CACHE_DIR=1 \
     PYTHONUNBUFFERED=1 \
@@ -18,9 +18,10 @@ RUN python3 -m pip install --upgrade pip && \
     pip install --index-url https://download.pytorch.org/whl/cu128 \
         torch torchvision torchaudio
 
-# Try to install flash-attn (prebuilt wheel preferred)
-# If it fails, continue - we'll patch WAN code to handle missing flash-attn
-RUN pip install flash-attn --no-build-isolation || echo "Flash-attn not available, will use PyTorch fallback"
+# Try to install flash-attn (prebuilt wheel or compile)
+# If compilation fails, continue - we have a fallback in the patch
+RUN pip install packaging ninja && \
+    (pip install flash-attn --no-build-isolation || echo "⚠️ Flash-attn compilation failed, will use PyTorch fallback")
 
 WORKDIR /workspace
 # Wan2.2 (video) – i2v/s2v CLI
