@@ -23,33 +23,43 @@ fi
 
 echo "[bootstrap] Final WAN model path: ${WAN_CKPT_DIR}"
 
-# Check if WAN I2V model exists, download if not found
-WAN_MODEL_DIR="${WAN_CKPT_DIR}/Wan2.2-I2V-A14B"
-WAN_T5_CHECK="${WAN_MODEL_DIR}/models_t5_umt5-xxl-enc-bf16.pth"
+# Optional: Check if WAN I2V model exists, download if AUTO_DOWNLOAD_MODELS=true
+# Users can pre-download models or download manually to avoid this
+if [ "${AUTO_DOWNLOAD_I2V:-false}" = "true" ]; then
+  WAN_MODEL_DIR="${WAN_CKPT_DIR}/Wan2.2-I2V-A14B"
+  WAN_T5_CHECK="${WAN_MODEL_DIR}/models_t5_umt5-xxl-enc-bf16.pth"
 
-if [ ! -f "${WAN_T5_CHECK}" ]; then
-  echo "[bootstrap] WAN I2V model not found at ${WAN_MODEL_DIR}"
-  echo "[bootstrap] Downloading Wan2.2-I2V-A14B model from Hugging Face..."
-  
-  # Set Hugging Face token if provided via environment
-  if [ -n "${HF_TOKEN:-}" ]; then
-    export HUGGING_FACE_HUB_TOKEN="${HF_TOKEN}"
-    echo "[bootstrap] Using HF_TOKEN for authentication"
-  fi
-  
-  mkdir -p "${WAN_MODEL_DIR}"
-  
-  # Download using huggingface-cli
-  if command -v huggingface-cli &> /dev/null; then
-    huggingface-cli download Wan-AI/Wan2.2-I2V-A14B --local-dir "${WAN_MODEL_DIR}" --local-dir-use-symlinks False || {
-      echo "[bootstrap] WARNING: Model download failed. Jobs may fail until models are available."
-    }
+  if [ ! -f "${WAN_T5_CHECK}" ]; then
+    echo "[bootstrap] WAN I2V model not found at ${WAN_MODEL_DIR}"
+    echo "[bootstrap] Downloading Wan2.2-I2V-A14B model from Hugging Face..."
+    
+    # Set Hugging Face token if provided via environment
+    if [ -n "${HF_TOKEN:-}" ]; then
+      export HUGGING_FACE_HUB_TOKEN="${HF_TOKEN}"
+      echo "[bootstrap] Using HF_TOKEN for authentication"
+    fi
+    
+    mkdir -p "${WAN_MODEL_DIR}"
+    
+    # Download using huggingface-cli
+    if command -v huggingface-cli &> /dev/null; then
+      huggingface-cli download Wan-AI/Wan2.2-I2V-A14B --local-dir "${WAN_MODEL_DIR}" --local-dir-use-symlinks False || {
+        echo "[bootstrap] WARNING: Model download failed. Jobs may fail until models are available."
+      }
+    else
+      echo "[bootstrap] WARNING: huggingface-cli not found. Install with: pip install huggingface_hub[cli]"
+      echo "[bootstrap] Jobs may fail until models are manually downloaded to ${WAN_MODEL_DIR}"
+    fi
   else
-    echo "[bootstrap] WARNING: huggingface-cli not found. Install with: pip install huggingface_hub[cli]"
-    echo "[bootstrap] Jobs may fail until models are manually downloaded to ${WAN_MODEL_DIR}"
+    echo "[bootstrap] WAN I2V model found at ${WAN_MODEL_DIR}"
   fi
 else
-  echo "[bootstrap] WAN I2V model found at ${WAN_MODEL_DIR}"
+  echo "[bootstrap] Skipping auto-download (set AUTO_DOWNLOAD_I2V=true to enable)"
+  # List available models
+  if [ -d "${WAN_CKPT_DIR}" ]; then
+    echo "[bootstrap] Available models in ${WAN_CKPT_DIR}:"
+    ls -1 "${WAN_CKPT_DIR}" | grep -i "Wan2.2" || echo "  (none found)"
+  fi
 fi
 
 # ComfyUI models symlink to persistent storage if available

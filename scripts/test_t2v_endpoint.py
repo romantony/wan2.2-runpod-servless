@@ -18,20 +18,22 @@ def submit_job(api_url, api_key, params):
     
     payload = {
         "input": {
-            "task": params["task"],
-            "prompt": params["prompt"],
-            "size": params.get("size", "1280*720"),
-            "sample_steps": params.get("steps", 24),
-            "sample_guide_scale": params.get("cfg", 6.0),
-            "frame_num": params.get("frames", 49),
-            "offload_model": True,
-            "convert_model_dtype": True,
-            "t5_cpu": True,
+            "params": {
+                "task": params["task"],
+                "prompt": params["prompt"],
+                "size": params.get("size", "1280*720"),
+                "sample_steps": params.get("steps", 24),
+                "sample_guide_scale": params.get("cfg", 6.0),
+                "frame_num": params.get("frames", 49),
+                "offload_model": True,
+                "convert_model_dtype": True,
+                "t5_cpu": True,
+            }
         }
     }
     
     if params.get("seed"):
-        payload["input"]["seed"] = params["seed"]
+        payload["input"]["params"]["seed"] = params["seed"]
     
     response = requests.post(f"{api_url}", headers=headers, json=payload)
     response.raise_for_status()
