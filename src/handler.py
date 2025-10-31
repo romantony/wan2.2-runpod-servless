@@ -43,11 +43,36 @@ def _build_cmd(args, image_path):
     offload = str(args.get("offload_model","True"))
     t5_cpu = str(args.get("t5_cpu","True"))
 
+    # Determine the correct model directory based on task
+    # WAN expects ckpt_dir to point to the specific model folder (e.g., Wan2.2-T2V-A14B)
+    task_upper = task.upper()
+    if "T2V" in task_upper:
+        model_name = "Wan2.2-T2V-A14B"
+    elif "I2V" in task_upper:
+        model_name = "Wan2.2-I2V-A14B"
+    elif "S2V" in task_upper:
+        model_name = "Wan2.2-S2V-14B"
+    elif "TI2V" in task_upper:
+        model_name = "Wan2.2-TI2V-5B"
+    elif "ANIMATE" in task_upper:
+        model_name = "Wan2.2-Animate-14B"
+    else:
+        # Default to task name with capitalization
+        model_name = f"Wan2.2-{task}"
+    
+    # Construct full checkpoint directory path
+    model_ckpt_dir = os.path.join(WAN_CKPT_DIR, model_name)
+    
+    # If the model directory doesn't exist, try without the prefix
+    # (in case user already has it in the exact format)
+    if not os.path.isdir(model_ckpt_dir):
+        model_ckpt_dir = WAN_CKPT_DIR
+
     cmd = [
         "python3", f"{WAN_HOME}/generate.py",
         "--task", task,
         "--size", size,
-        "--ckpt_dir", WAN_CKPT_DIR,
+        "--ckpt_dir", model_ckpt_dir,
         "--offload_model", offload,
     ]
     # Only pass image flag for i2v tasks
