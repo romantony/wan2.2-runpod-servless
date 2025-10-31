@@ -2,11 +2,11 @@
 set -euo pipefail
 
 : "${WAN_HOME:=/workspace/Wan2.2}"
-: "${WAN_CKPT_DIR:=/workspace/models}"
+: "${WAN_CKPT_DIR:=/workspace/Wan2.2}"  # Point to parent directory containing model folders
 : "${COMFYUI_ROOT:=/workspace/ComfyUI}"
 : "${COMFYUI_MODELS_DIR:=/workspace/ComfyUI/models}"
 
-echo "[bootstrap] Preferred WAN model path: ${WAN_CKPT_DIR}"
+echo "[bootstrap] WAN models directory: ${WAN_CKPT_DIR}"
 
 # Fallbacks for common RunPod mounts
 if [ ! -d "${WAN_CKPT_DIR}" ] || [ -z "$(ls -A "${WAN_CKPT_DIR}" 2>/dev/null || true)" ]; then
