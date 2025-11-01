@@ -21,3 +21,8 @@ test_output*.png
 QUICK_START.md
 TEST_COMMANDS.md
 scripts/quick_test.py
+test_models.py
+test_wan_cli.py
+DEPLOYMENT_ANALYSIS.md
+check_build_status.py
+check_directory.py
