@@ -39,6 +39,18 @@ RUN python3 /workspace/patch_attention.py
 RUN git clone --depth 1 https://github.com/comfyanonymous/ComfyUI.git /workspace/runpod-slim/ComfyUI && \
     python3 -m pip install -r /workspace/runpod-slim/ComfyUI/requirements.txt || true
 
+# Install ComfyUI Custom Nodes for Video Generation
+RUN cd /workspace/runpod-slim/ComfyUI/custom_nodes && \
+    # Video Helper Suite - Essential for video generation (VHS_VideoCombine, etc.)
+    git clone https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite.git && \
+    pip install -r ComfyUI-VideoHelperSuite/requirements.txt && \
+    # AnimateDiff Evolved - Advanced video animation
+    git clone https://github.com/Kosinkadink/ComfyUI-AnimateDiff-Evolved.git && \
+    pip install -r ComfyUI-AnimateDiff-Evolved/requirements.txt || true && \
+    # Advanced ControlNet - For better control
+    git clone https://github.com/Kosinkadink/ComfyUI-Advanced-ControlNet.git && \
+    pip install -r ComfyUI-Advanced-ControlNet/requirements.txt || true
+
 # Copy extra_model_paths.yaml to configure model locations
 COPY extra_model_paths.yaml /workspace/extra_model_paths.yaml
 
