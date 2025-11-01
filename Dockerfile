@@ -4,11 +4,12 @@ ENV DEBIAN_FRONTEND=noninteractive \
     PIP_NO_CACHE_DIR=1 \
     PYTHONUNBUFFERED=1 \
     WAN_HOME=/workspace/Wan2.2 \
-    WAN_CKPT_DIR=/workspace/models \
+    WAN_CKPT_DIR=/runpod-volume/models \
     COMFYUI_ROOT=/workspace/runpod-slim/ComfyUI \
     COMFYUI_HOST=127.0.0.1 \
     COMFYUI_PORT=8188 \
-    TINI_SUBREAPER=1
+    TINI_SUBREAPER=1 \
+    RUNPOD_MAX_CONCURRENCY=1
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git git-lfs python3 python3-pip python3-venv python3-dev curl wget ca-certificates tini ffmpeg libsndfile1 \

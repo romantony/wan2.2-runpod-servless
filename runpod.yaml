@@ -6,7 +6,7 @@ imageName: "<YOUR_REGISTRY>/wan22-runpod-serverless:latest"
 # Contains: WAN i2v/s2v models + FLUX.1-dev in /runpod-volume/models/
 env:
   - key: WAN_CKPT_DIR
-    value: "/workspace/models"
+    value: "/runpod-volume/models"
   - key: RUNPOD_MAX_CONCURRENCY
     value: "1"
   - key: COMFYUI_ROOT

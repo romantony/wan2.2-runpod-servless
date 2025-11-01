@@ -4,7 +4,8 @@
 # WAN 2.2 Permanent Storage Configuration
 wan2_permanent_storage:
   # Base path where all models are stored
-  base_path: /workspace/models
+  # Points to permanent model storage on RunPod volume
+  base_path: /runpod-volume/models
   
   # Model directories (relative to base_path)
   # All paths below are appended to /workspace/models/
