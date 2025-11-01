@@ -279,67 +279,190 @@ def create_i2v_workflow(
     seed=-1,
     steps=20,
     cfg_scale=7.0,
+    width=1280,
+    height=720,
+    num_frames=121,
+    fps=24,
     use_lora=False,
     lora_name="wan2.2_i2v_lightx2v_4steps_lora_v1_high_noise.safetensors",
-    lora_strength=1.0
+    lora_strength=1.0,
+    sampler_name="euler",
+    scheduler="normal",
+    denoise=1.0
 ):
     """
-    Create a ComfyUI workflow for Image-to-Video generation
+    Create a ComfyUI workflow for WAN 2.2 Image-to-Video generation
     
-    This is a template - you'll need to customize based on your ComfyUI nodes
+    This workflow follows the pattern:
+    LoadImage → VAEEncode → UNetLoader → CLIPTextEncode → KSampler → VAEDecode → SaveVideo
+    
+    Parameters:
+    - image_filename: Name of the uploaded image in ComfyUI
+    - diffusion_model: WAN 2.2 I2V model (high_noise or low_noise)
+    - vae_model: VAE model for encoding/decoding
+    - text_encoder: Text encoder model (UMT5-XXL)
+    - prompt: Text prompt for generation
+    - seed: Random seed (-1 for random)
+    - steps: Number of diffusion steps (4 with LoRA, 20 without)
+    - cfg_scale: Classifier-free guidance scale
+    - width, height: Output video dimensions
+    - num_frames: Number of frames to generate
+    - fps: Frames per second
+    - use_lora: Whether to use LightX2V acceleration
+    - lora_name: LoRA model name
+    - lora_strength: LoRA strength (0.0-1.0)
+    - sampler_name: Sampler to use
+    - scheduler: Scheduler to use
+    - denoise: Denoising strength
     """
+    import random
+    
+    # Generate random seed if -1
+    if seed == -1:
+        seed = random.randint(0, 2**32 - 1)
+    
+    # Build workflow
+    # Node 1: Load input image
     workflow = {
         "1": {
-            "inputs": {
-                "unet_name": diffusion_model
-            },
-            "class_type": "UNETLoader",
-            "_meta": {"title": "Load Diffusion Model"}
-        },
-        "2": {
-            "inputs": {
-                "vae_name": vae_model
-            },
-            "class_type": "VAELoader",
-            "_meta": {"title": "Load VAE"}
-        },
-        "3": {
             "inputs": {
                 "image": image_filename,
                 "upload": "image"
             },
             "class_type": "LoadImage",
             "_meta": {"title": "Load Input Image"}
-        },
-        "4": {
-            "inputs": {
-                "text": prompt,
-                "clip": ["5", 0]
-            },
-            "class_type": "CLIPTextEncode",
-            "_meta": {"title": "Encode Prompt"}
-        },
-        "5": {
-            "inputs": {
-                "clip_name1": text_encoder,
-                "type": "wan"
-            },
-            "class_type": "CLIPLoader",
-            "_meta": {"title": "Load Text Encoder"}
         }
     }
     
-    # Add LoRA if requested
+    # Node 2: Load VAE
+    workflow["2"] = {
+        "inputs": {
+            "vae_name": vae_model
+        },
+        "class_type": "VAELoader",
+        "_meta": {"title": "Load VAE"}
+    }
+    
+    # Node 3: Load Diffusion Model (UNET)
+    model_input_node = "3"
+    workflow["3"] = {
+        "inputs": {
+            "unet_name": diffusion_model
+        },
+        "class_type": "UNETLoader",
+        "_meta": {"title": "Load Diffusion Model"}
+    }
+    
+    # Node 4: Load LoRA (optional)
     if use_lora:
-        workflow["6"] = {
+        workflow["4"] = {
             "inputs": {
                 "lora_name": lora_name,
                 "strength_model": lora_strength,
-                "model": ["1", 0]
+                "strength_clip": lora_strength,
+                "model": [model_input_node, 0],
+                "clip": ["3", 1]  # Most UNetLoaders also output CLIP
             },
             "class_type": "LoraLoader",
-            "_meta": {"title": "Load LoRA"}
+            "_meta": {"title": "Load LoRA Acceleration"}
         }
+        model_input_node = "4"  # Use LoRA output as model input
+        clip_node = "4"
+    else:
+        clip_node = "3"
+    
+    # Node 5: Load Text Encoder (if CLIP not from UNET)
+    # Note: Some implementations have separate CLIP loader
+    workflow["5"] = {
+        "inputs": {
+            "clip_name1": text_encoder,
+            "type": "wan"
+        },
+        "class_type": "DualCLIPLoader",
+        "_meta": {"title": "Load Text Encoder"}
+    }
+    clip_node = "5"
+    
+    # Node 6: Encode positive prompt
+    workflow["6"] = {
+        "inputs": {
+            "text": prompt if prompt else "high quality video",
+            "clip": [clip_node, 0]
+        },
+        "class_type": "CLIPTextEncode",
+        "_meta": {"title": "Encode Positive Prompt"}
+    }
+    
+    # Node 7: Encode negative prompt
+    workflow["7"] = {
+        "inputs": {
+            "text": "low quality, blurry, distorted",
+            "clip": [clip_node, 0]
+        },
+        "class_type": "CLIPTextEncode",
+        "_meta": {"title": "Encode Negative Prompt"}
+    }
+    
+    # Node 8: VAE Encode input image to latent
+    workflow["8"] = {
+        "inputs": {
+            "pixels": ["1", 0],
+            "vae": ["2", 0]
+        },
+        "class_type": "VAEEncode",
+        "_meta": {"title": "Encode Image to Latent"}
+    }
+    
+    # Node 9: Empty Latent Video (for video generation)
+    workflow["9"] = {
+        "inputs": {
+            "width": width,
+            "height": height,
+            "length": num_frames,
+            "batch_size": 1
+        },
+        "class_type": "EmptyLatentVideo",
+        "_meta": {"title": "Create Empty Video Latent"}
+    }
+    
+    # Node 10: KSampler for video generation
+    workflow["10"] = {
+        "inputs": {
+            "seed": seed,
+            "steps": steps,
+            "cfg": cfg_scale,
+            "sampler_name": sampler_name,
+            "scheduler": scheduler,
+            "denoise": denoise,
+            "model": [model_input_node, 0],
+            "positive": ["6", 0],
+            "negative": ["7", 0],
+            "latent_image": ["9", 0]  # Use empty video latent
+        },
+        "class_type": "KSampler",
+        "_meta": {"title": "Video Generation Sampler"}
+    }
+    
+    # Node 11: VAE Decode latent to video
+    workflow["11"] = {
+        "inputs": {
+            "samples": ["10", 0],
+            "vae": ["2", 0]
+        },
+        "class_type": "VAEDecode",
+        "_meta": {"title": "Decode Latent to Video"}
+    }
+    
+    # Node 12: Save video
+    workflow["12"] = {
+        "inputs": {
+            "filename_prefix": "wan_i2v",
+            "fps": fps,
+            "images": ["11", 0]
+        },
+        "class_type": "VHS_VideoCombine",
+        "_meta": {"title": "Save Video"}
+    }
     
     return workflow
 
@@ -349,36 +472,177 @@ def create_s2v_workflow(
     diffusion_model="wan2.2_s2v_14B_fp8_scaled.safetensors",
     vae_model="wan_2.1_vae.safetensors",
     audio_encoder="wav2vec2_large_english_fp16.safetensors",
+    text_encoder="umt5_xxl_fp8_e4m3fn_scaled.safetensors",
     prompt="",
     seed=-1,
-    steps=20
+    steps=20,
+    cfg_scale=7.0,
+    width=1280,
+    height=720,
+    num_frames=121,
+    fps=24,
+    sampler_name="euler",
+    scheduler="normal",
+    denoise=1.0
 ):
     """
-    Create a ComfyUI workflow for Sound-to-Video generation
+    Create a ComfyUI workflow for WAN 2.2 Sound-to-Video generation
+    
+    This workflow follows the pattern:
+    LoadAudio → AudioEncode → UNetLoader → CLIPTextEncode → KSampler → VAEDecode → SaveVideo
+    
+    Parameters:
+    - audio_filename: Name of the uploaded audio file in ComfyUI
+    - diffusion_model: WAN 2.2 S2V model
+    - vae_model: VAE model for decoding
+    - audio_encoder: Audio encoder model (Wav2Vec2)
+    - text_encoder: Text encoder model (UMT5-XXL)
+    - prompt: Text prompt for generation
+    - seed: Random seed (-1 for random)
+    - steps: Number of diffusion steps
+    - cfg_scale: Classifier-free guidance scale
+    - width, height: Output video dimensions
+    - num_frames: Number of frames to generate
+    - fps: Frames per second
+    - sampler_name: Sampler to use
+    - scheduler: Scheduler to use
+    - denoise: Denoising strength
     """
-    # This is a template - customize based on your actual ComfyUI nodes
+    import random
+    
+    # Generate random seed if -1
+    if seed == -1:
+        seed = random.randint(0, 2**32 - 1)
+    
+    # Build workflow
+    # Node 1: Load audio file
     workflow = {
         "1": {
             "inputs": {
-                "unet_name": diffusion_model
+                "audio": audio_filename
             },
-            "class_type": "UNETLoader",
-            "_meta": {"title": "Load S2V Model"}
-        },
-        "2": {
-            "inputs": {
-                "vae_name": vae_model
-            },
-            "class_type": "VAELoader",
-            "_meta": {"title": "Load VAE"}
-        },
-        "3": {
-            "inputs": {
-                "audio_encoder_name": audio_encoder
-            },
-            "class_type": "AudioEncoderLoader",
-            "_meta": {"title": "Load Audio Encoder"}
+            "class_type": "LoadAudio",
+            "_meta": {"title": "Load Input Audio"}
         }
+    }
+    
+    # Node 2: Load Audio Encoder
+    workflow["2"] = {
+        "inputs": {
+            "audio_encoder_name": audio_encoder
+        },
+        "class_type": "AudioEncoderLoader",
+        "_meta": {"title": "Load Audio Encoder"}
+    }
+    
+    # Node 3: Encode audio
+    workflow["3"] = {
+        "inputs": {
+            "audio": ["1", 0],
+            "encoder": ["2", 0]
+        },
+        "class_type": "AudioEncode",
+        "_meta": {"title": "Encode Audio"}
+    }
+    
+    # Node 4: Load VAE
+    workflow["4"] = {
+        "inputs": {
+            "vae_name": vae_model
+        },
+        "class_type": "VAELoader",
+        "_meta": {"title": "Load VAE"}
+    }
+    
+    # Node 5: Load Diffusion Model (UNET)
+    workflow["5"] = {
+        "inputs": {
+            "unet_name": diffusion_model
+        },
+        "class_type": "UNETLoader",
+        "_meta": {"title": "Load S2V Model"}
+    }
+    
+    # Node 6: Load Text Encoder
+    workflow["6"] = {
+        "inputs": {
+            "clip_name1": text_encoder,
+            "type": "wan"
+        },
+        "class_type": "DualCLIPLoader",
+        "_meta": {"title": "Load Text Encoder"}
+    }
+    
+    # Node 7: Encode positive prompt
+    workflow["7"] = {
+        "inputs": {
+            "text": prompt if prompt else "high quality video synchronized with audio",
+            "clip": ["6", 0]
+        },
+        "class_type": "CLIPTextEncode",
+        "_meta": {"title": "Encode Positive Prompt"}
+    }
+    
+    # Node 8: Encode negative prompt
+    workflow["8"] = {
+        "inputs": {
+            "text": "low quality, blurry, distorted, out of sync",
+            "clip": ["6", 0]
+        },
+        "class_type": "CLIPTextEncode",
+        "_meta": {"title": "Encode Negative Prompt"}
+    }
+    
+    # Node 9: Empty Latent Video
+    workflow["9"] = {
+        "inputs": {
+            "width": width,
+            "height": height,
+            "length": num_frames,
+            "batch_size": 1
+        },
+        "class_type": "EmptyLatentVideo",
+        "_meta": {"title": "Create Empty Video Latent"}
+    }
+    
+    # Node 10: KSampler for S2V generation
+    workflow["10"] = {
+        "inputs": {
+            "seed": seed,
+            "steps": steps,
+            "cfg": cfg_scale,
+            "sampler_name": sampler_name,
+            "scheduler": scheduler,
+            "denoise": denoise,
+            "model": ["5", 0],
+            "positive": ["7", 0],
+            "negative": ["8", 0],
+            "latent_image": ["9", 0],
+            "audio_conditioning": ["3", 0]  # Add audio conditioning
+        },
+        "class_type": "KSampler",
+        "_meta": {"title": "S2V Generation Sampler"}
+    }
+    
+    # Node 11: VAE Decode
+    workflow["11"] = {
+        "inputs": {
+            "samples": ["10", 0],
+            "vae": ["4", 0]
+        },
+        "class_type": "VAEDecode",
+        "_meta": {"title": "Decode Latent to Video"}
+    }
+    
+    # Node 12: Save video
+    workflow["12"] = {
+        "inputs": {
+            "filename_prefix": "wan_s2v",
+            "fps": fps,
+            "images": ["11", 0]
+        },
+        "class_type": "VHS_VideoCombine",
+        "_meta": {"title": "Save Video"}
     }
     
     return workflow
