@@ -26,3 +26,10 @@ test_wan_cli.py
 DEPLOYMENT_ANALYSIS.md
 check_build_status.py
 check_directory.py
+jetski.jpg
+test_i2v_generation.py
+test_i2v_with_image.py
+test_jetski_i2v.py
+test_jetski_simple.py
+test_jetski.jpg
+test_wan_cli_i2v.py
