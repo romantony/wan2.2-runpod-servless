@@ -3,3 +3,21 @@ outputs/
 tmp/
 *.mp4
 scripts/test_endpoint.py
+
+# Environment files with credentials
+.env
+.env.local
+.env.*.local
+
+# API keys and secrets
+**/api_key.txt
+**/credentials.json
+
+# Test outputs
+test_output*.mp4
+test_output*.png
+
+# Local test files with API keys (use templates instead)
+QUICK_START.md
+TEST_COMMANDS.md
+scripts/quick_test.py
