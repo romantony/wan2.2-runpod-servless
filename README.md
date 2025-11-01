@@ -1,10 +1,66 @@
 # Wan2.2 + ComfyUI on RunPod Serverless (Models in Persistent Storage)
 
-This image installs both:
-- Wan2.2 video generator (supports i2v and s2v via CLI)
-- ComfyUI (for image pipelines like FLUX.1-dev)
+This image provides:
+- **WAN 2.2** video generation (I2V, S2V, Animation)
+- **ComfyUI** for workflow-based generation
+- **Persistent storage** integration for models
 
-It uses your pre-downloaded models from persistent storage. Mount your RunPod volume so the container sees the weights and avoids network downloads.
+## 📚 Documentation
+
+- **[WAN 2.2 Implementation Guide](doc/WAN2.2_Implementation.md)** - Complete setup guide
+- **[Storage Strategy](doc/Storage_Strategy_Summary.md)** - Recommended storage approach
+- **[Storage Migration](doc/Storage_Migration_Guide.md)** - Migration instructions
+- **[Reference Architecture](doc/Ref_Achitecture.md)** - API and architecture details
+
+## 🎯 Quick Start
+
+### Your Current Setup
+
+You have **51GB of production-ready models** including:
+- ✅ 4× WAN 2.2 diffusion models (14B parameters, fp8)
+- ✅ 5× LightX2V LoRA accelerators (4-step fast generation)
+- ✅ Complete support infrastructure (VAE, encoders)
+
+**Capabilities:**
+- Image-to-Video (high & low noise variants)
+- Sound-to-Video (audio-driven generation)
+- Animation (with lighting control)
+- Fast generation (5-7× faster with LoRAs)
+
+## 📦 Model Storage
+
+### Recommended Structure: `/workspace/models/`
+
+Store models at `/workspace/models/` on permanent storage (network volume):
+
+```
+/workspace/models/                    👈 51GB on network volume
+├── diffusion_models/                 (4× 14GB WAN 2.2 models)
+├── loras/                            (5× 100MB LoRAs)
+├── vae/                              (wan_2.1_vae.safetensors)
+├── text_encoders/                    (UmT5-XXL)
+├── audio_encoders/                   (Wav2Vec2)
+├── clip_vision/                      (CLIP-H)
+└── configs/
+```
+
+**Why this structure?**
+- ✅ Clean separation: models separate from application code
+- ✅ Easy upgrades: update ComfyUI without touching models
+- ✅ Shared across workers: single copy, multiple containers
+- ✅ Standard practice: follows RunPod best practices
+
+### Configuration
+
+The `extra_model_paths.yaml` file (included in repo) tells ComfyUI where to find models:
+
+```yaml
+wan2_permanent_storage:
+  base_path: /workspace/models
+  diffusion_models: diffusion_models/
+  vae: vae/
+  # ... etc
+```
 
 ## Model Setup
 
@@ -31,23 +87,52 @@ huggingface-cli download Wan-AI/Wan2.2-I2V-A14B --local-dir /runpod-volume/model
 Ensure the model directory contains `models_t5_umt5-xxl-enc-bf16.pth` and other checkpoint files.
 
 ## Build & Deploy
+
+### 1. Build Docker Image
 ```bash
 docker build -t <YOUR_REGISTRY>/wan22-runpod-serverless:latest .
 docker push <YOUR_REGISTRY>/wan22-runpod-serverless:latest
 ```
-Create a RunPod Serverless template using the image. Set env:
-- `WAN_CKPT_DIR`: `/runpod-volume/Wan2.2` (or `/workspace/models`)
-- `HF_TOKEN`: Your Hugging Face token for auto-downloads
-- `RUNPOD_MAX_CONCURRENCY`: `1`
-- `COMFYUI_ROOT`: `/workspace/ComfyUI`
-- `COMFYUI_MODELS_DIR`: `/workspace/ComfyUI/models`
 
-**Mount your RunPod permanent storage volume (ID: p63c2g0961) to `/runpod-volume`**
+### 2. Configure Environment Variables
 
-Your models are stored in: `/runpod-volume/models/` with the following structure:
-- **WAN Image-to-Video models** (i2v-A14B)
-- **WAN Speech-to-Video models** (s2v-*)
-- **FLUX.1-dev models** (for ComfyUI)
+Set in your RunPod Serverless template:
+
+| Variable | Value | Purpose |
+|----------|-------|---------|
+| `HF_TOKEN` | `hf_your_token_here` | Hugging Face authentication |
+| `RUNPOD_MAX_CONCURRENCY` | `1` | Single job per worker |
+| `COMFYUI_ROOT` | `/workspace/runpod-slim/ComfyUI` | ComfyUI installation path |
+
+### 3. Mount Network Volume
+
+**In RunPod Dashboard:**
+- Attach your network volume (ID: `p63c2g0961`)
+- **Mount path:** `/workspace/models` ✅ **RECOMMENDED**
+
+Your models should be organized as:
+```
+/workspace/models/
+├── diffusion_models/
+│   ├── Wan2_2-Animate-14B_fp8_e4m3fn_scaled_KJ.safetensors
+│   ├── wan2.2_i2v_high_noise_14B_fp8_scaled.safetensors
+│   ├── wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors
+│   └── wan2.2_s2v_14B_fp8_scaled.safetensors
+├── loras/ (5 LoRA files)
+├── vae/ (wan_2.1_vae.safetensors)
+├── text_encoders/ (UmT5-XXL)
+├── audio_encoders/ (Wav2Vec2)
+└── clip_vision/ (CLIP-H)
+```
+
+### 4. Verify Setup
+
+Once deployed, test model detection:
+```bash
+curl http://127.0.0.1:8188/object_info | jq '.UNETLoader.input.required.unet_name[0]'
+```
+
+Expected: List of your 4 WAN 2.2 diffusion models
 
 Mount your RunPod permanent storage and ensure your models are placed in one of these locations:
 

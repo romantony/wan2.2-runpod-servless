@@ -5,8 +5,9 @@ ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONUNBUFFERED=1 \
     WAN_HOME=/workspace/Wan2.2 \
     WAN_CKPT_DIR=/workspace/models \
-    COMFYUI_ROOT=/workspace/ComfyUI \
-    COMFYUI_MODELS_DIR=/workspace/ComfyUI/models \
+    COMFYUI_ROOT=/workspace/runpod-slim/ComfyUI \
+    COMFYUI_HOST=127.0.0.1 \
+    COMFYUI_PORT=8188 \
     TINI_SUBREAPER=1
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -33,9 +34,15 @@ RUN git clone https://github.com/Wan-Video/Wan2.2.git && \
 COPY scripts/patch_attention.py /workspace/
 RUN python3 /workspace/patch_attention.py
 
-# ComfyUI (for image pipelines like FLUX dev)
-RUN git clone --depth 1 https://github.com/comfyanonymous/ComfyUI.git ${COMFYUI_ROOT} && \
-    python3 -m pip install -r ${COMFYUI_ROOT}/requirements.txt || true
+# ComfyUI (for image and video pipelines)
+RUN git clone --depth 1 https://github.com/comfyanonymous/ComfyUI.git /workspace/runpod-slim/ComfyUI && \
+    python3 -m pip install -r /workspace/runpod-slim/ComfyUI/requirements.txt || true
+
+# Copy extra_model_paths.yaml to configure model locations
+COPY extra_model_paths.yaml /workspace/extra_model_paths.yaml
+
+# Create model mount point
+RUN mkdir -p /workspace/models
 
 COPY requirements.txt /workspace/requirements.txt
 RUN pip install -r /workspace/requirements.txt

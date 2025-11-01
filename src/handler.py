@@ -1,14 +1,20 @@
 import os, io, json, time, base64, shutil, subprocess, uuid, requests, runpod, threading
+from comfyui_client import ComfyUIClient, create_i2v_workflow, create_s2v_workflow
 
 WAN_HOME = os.environ.get("WAN_HOME","/workspace/Wan2.2")
 WAN_CKPT_DIR = os.environ.get("WAN_CKPT_DIR","/workspace/models")
-COMFYUI_ROOT = os.environ.get("COMFYUI_ROOT","/workspace/ComfyUI")
-COMFYUI_MODELS_DIR = os.environ.get("COMFYUI_MODELS_DIR","/workspace/ComfyUI/models")
+COMFYUI_ROOT = os.environ.get("COMFYUI_ROOT","/workspace/runpod-slim/ComfyUI")
+COMFYUI_HOST = os.environ.get("COMFYUI_HOST", "127.0.0.1")
+COMFYUI_PORT = os.environ.get("COMFYUI_PORT", "8188")
+
 # Be tolerant to common RunPod Serverless mount path defaults
 if not os.path.isdir(WAN_CKPT_DIR) and os.path.isdir("/runpod-volume"):
     WAN_CKPT_DIR = "/runpod-volume"
 OUT_DIR = os.environ.get("WAN_OUT_DIR","/workspace/outputs")
 os.makedirs(OUT_DIR, exist_ok=True)
+
+# Initialize ComfyUI client
+comfyui_client = ComfyUIClient(f"http://{COMFYUI_HOST}:{COMFYUI_PORT}")
 
 def _download_ref_image(inputs):
     os.makedirs("/workspace/ref", exist_ok=True)
@@ -323,17 +329,209 @@ def _normalize_event(event):
     return event or {}
 
 
+# ComfyUI Handlers
+
+def handle_comfyui_workflow(event):
+    """Execute a ComfyUI workflow"""
+    rid = str(uuid.uuid4())
+    params = event.get("params") or event.get("inputs") or {}
+    
+    # Get workflow from params
+    workflow = params.get("workflow")
+    if not workflow:
+        return {"error": "Missing 'workflow' parameter"}
+    
+    _progress(5, "Preparing ComfyUI workflow...")
+    
+    # Handle image uploads if present
+    images = params.get("images", [])
+    for img in images:
+        img_name = img.get("name", "input.png")
+        img_data = img.get("data") or img.get("image")
+        
+        if img_data:
+            result = comfyui_client.upload_image(img_data, img_name)
+            if "error" in result:
+                return {"error": f"Image upload failed: {result['error']}"}
+    
+    _progress(20, "Executing workflow...")
+    
+    # Execute the workflow
+    timeout = params.get("timeout", 600)
+    result = comfyui_client.execute_workflow(workflow, timeout)
+    
+    if result.get("status") != "completed":
+        return {"request_id": rid, "error": result.get("error", "Workflow execution failed"), "result": result}
+    
+    _progress(90, "Collecting outputs...")
+    
+    # Save outputs
+    outputs = []
+    for output in result.get("outputs", []):
+        filename = output.get("filename", f"{rid}_output.png")
+        output_path = os.path.join(OUT_DIR, filename)
+        
+        # Save the file
+        file_data = base64.b64decode(output.get("data", ""))
+        with open(output_path, "wb") as f:
+            f.write(file_data)
+        
+        outputs.append({
+            "filename": filename,
+            "path": output_path,
+            "size": len(file_data)
+        })
+    
+    _progress(100, "Completed")
+    
+    # Return results
+    if params.get("return_base64", False):
+        return {
+            "request_id": rid,
+            "status": "completed",
+            "outputs": [
+                {
+                    "filename": o["filename"],
+                    "data": base64.b64encode(open(o["path"], "rb").read()).decode("utf-8"),
+                    "size": o["size"]
+                }
+                for o in outputs
+            ]
+        }
+    else:
+        return {
+            "request_id": rid,
+            "status": "completed",
+            "outputs": outputs
+        }
+
+
+def handle_comfyui_i2v(event):
+    """Handle Image-to-Video via ComfyUI"""
+    rid = str(uuid.uuid4())
+    params = event.get("params") or event.get("inputs") or {}
+    
+    # Download/get input image
+    image_path = _download_ref_image(params)
+    if not image_path:
+        return {"error": "Missing reference image (url/base64/path) for I2V task"}
+    
+    _progress(5, "Uploading image to ComfyUI...")
+    
+    # Upload image to ComfyUI
+    image_name = f"{rid}_input.png"
+    upload_result = comfyui_client.upload_image(image_path, image_name)
+    
+    if "error" in upload_result:
+        return {"error": f"Image upload failed: {upload_result['error']}"}
+    
+    _progress(15, "Creating I2V workflow...")
+    
+    # Create workflow
+    workflow = create_i2v_workflow(
+        image_filename=image_name,
+        diffusion_model=params.get("diffusion_model", "wan2.2_i2v_high_noise_14B_fp8_scaled.safetensors"),
+        vae_model=params.get("vae_model", "wan_2.1_vae.safetensors"),
+        prompt=params.get("prompt", ""),
+        seed=params.get("seed", -1),
+        steps=params.get("steps", 20),
+        cfg_scale=params.get("cfg_scale", 7.0),
+        use_lora=params.get("use_lora", False),
+        lora_name=params.get("lora_name", "wan2.2_i2v_lightx2v_4steps_lora_v1_high_noise.safetensors"),
+        lora_strength=params.get("lora_strength", 1.0)
+    )
+    
+    _progress(25, "Executing I2V generation...")
+    
+    # Execute workflow
+    timeout = params.get("timeout", 600)
+    result = comfyui_client.execute_workflow(workflow, timeout)
+    
+    if result.get("status") != "completed":
+        return {"request_id": rid, "error": result.get("error", "I2V generation failed"), "result": result}
+    
+    _progress(95, "Saving outputs...")
+    
+    # Save outputs
+    outputs = []
+    for output in result.get("outputs", []):
+        filename = f"{rid}_i2v_output.mp4"
+        output_path = os.path.join(OUT_DIR, filename)
+        
+        file_data = base64.b64decode(output.get("data", ""))
+        with open(output_path, "wb") as f:
+            f.write(file_data)
+        
+        outputs.append(output_path)
+    
+    _progress(100, "Completed")
+    
+    if params.get("return_video", True) and outputs:
+        video_data = open(outputs[0], "rb").read()
+        return {
+            "request_id": rid,
+            "status": "completed",
+            "result": {
+                "filename": os.path.basename(outputs[0]),
+                "data": "data:video/mp4;base64," + base64.b64encode(video_data).decode("utf-8")
+            }
+        }
+    else:
+        return {
+            "request_id": rid,
+            "status": "completed",
+            "outputs": outputs
+        }
+
+
+def handle_comfyui_models(event):
+    """List available models in ComfyUI"""
+    models = comfyui_client.get_available_models()
+    return {
+        "status": "success",
+        "models": models
+    }
+
+
 def handler(event):
     # Unwrap RunPod job wrapper shape: { id, input: { ... } }
     event = _normalize_event(event)
+    
+    # Health check
     if event.get("health"):
-        ok = os.path.isdir(WAN_HOME) and os.path.isdir(WAN_CKPT_DIR)
-        return {"ok": ok, "wan_home": WAN_HOME, "ckpt_dir": WAN_CKPT_DIR}
+        wan_ok = os.path.isdir(WAN_HOME) and os.path.isdir(WAN_CKPT_DIR)
+        comfyui_ok = comfyui_client.health_check()
+        return {
+            "ok": wan_ok and comfyui_ok,
+            "wan_home": WAN_HOME,
+            "ckpt_dir": WAN_CKPT_DIR,
+            "comfyui_url": comfyui_client.url,
+            "comfyui_status": "online" if comfyui_ok else "offline"
+        }
+    
     action = (event.get("action") or "").lower()
-    if action in ("request","generate","create"): return handle_request(event)
-    if action in ("status","get","result"): return handle_status(event)
+    
+    # ComfyUI actions
+    if action == "comfyui_workflow":
+        return handle_comfyui_workflow(event)
+    if action == "comfyui_i2v":
+        return handle_comfyui_i2v(event)
+    if action == "comfyui_models":
+        return handle_comfyui_models(event)
+    
+    # WAN actions
+    if action in ("request","generate","create"):
+        return handle_request(event)
+    if action in ("status","get","result"):
+        return handle_status(event)
+    
+    # Auto-detect action
+    if "workflow" in event:
+        return handle_comfyui_workflow(event)
     if "inputs" in event or "params" in event:
-        event["action"]="request"; return handle_request(event)
-    return {"error":"Unsupported event. Use action=request|status or provide inputs."}
+        event["action"]="request"
+        return handle_request(event)
+    
+    return {"error": "Unsupported event. Use action=request|status|comfyui_workflow|comfyui_i2v|comfyui_models"}
 
 runpod.serverless.start({"handler": handler})

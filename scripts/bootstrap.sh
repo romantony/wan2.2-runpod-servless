@@ -2,11 +2,14 @@
 set -euo pipefail
 
 : "${WAN_HOME:=/workspace/Wan2.2}"
-: "${WAN_CKPT_DIR:=/workspace/Wan2.2}"  # Point to parent directory containing model folders
-: "${COMFYUI_ROOT:=/workspace/ComfyUI}"
-: "${COMFYUI_MODELS_DIR:=/workspace/ComfyUI/models}"
+: "${WAN_CKPT_DIR:=/workspace/models}"
+: "${COMFYUI_ROOT:=/workspace/runpod-slim/ComfyUI}"
+: "${COMFYUI_HOST:=127.0.0.1}"
+: "${COMFYUI_PORT:=8188}"
 
+echo "[bootstrap] ===== WAN 2.2 + ComfyUI Setup ====="
 echo "[bootstrap] WAN models directory: ${WAN_CKPT_DIR}"
+echo "[bootstrap] ComfyUI root: ${COMFYUI_ROOT}"
 
 # Fallbacks for common RunPod mounts
 if [ ! -d "${WAN_CKPT_DIR}" ] || [ -z "$(ls -A "${WAN_CKPT_DIR}" 2>/dev/null || true)" ]; then
@@ -62,42 +65,68 @@ else
   fi
 fi
 
-# ComfyUI models symlink to persistent storage if available
-mkdir -p "${COMFYUI_ROOT}" "${COMFYUI_MODELS_DIR}"
-PERSIST_ROOT=""
-if [ -d "/runpod-volume" ]; then
-  PERSIST_ROOT="/runpod-volume"
-elif [ -d "${WAN_CKPT_DIR}" ]; then
-  PERSIST_ROOT="${WAN_CKPT_DIR}"
+# Setup ComfyUI model paths
+echo "[bootstrap] Setting up ComfyUI model configuration..."
+
+# Create/update extra_model_paths.yaml from permanent storage or template
+if [ -f "/workspace/models/extra_model_paths.yaml" ]; then
+  echo "[bootstrap] Using extra_model_paths.yaml from permanent storage"
+  ln -sf /workspace/models/extra_model_paths.yaml "${COMFYUI_ROOT}/extra_model_paths.yaml"
+elif [ -f "/workspace/extra_model_paths.yaml" ]; then
+  echo "[bootstrap] Using extra_model_paths.yaml from image"
+  cp /workspace/extra_model_paths.yaml "${COMFYUI_ROOT}/extra_model_paths.yaml"
+else
+  echo "[bootstrap] Creating default extra_model_paths.yaml"
+  cat > "${COMFYUI_ROOT}/extra_model_paths.yaml" << 'EOF'
+wan2_permanent_storage:
+  base_path: /workspace/models
+  
+  diffusion_models: diffusion_models/
+  unet: unet/
+  vae: vae/
+  text_encoders: text_encoders/
+  clip: clip/
+  audio_encoders: audio_encoders/
+  clip_vision: clip_vision/
+  loras: loras/
+  checkpoints: checkpoints/
+  controlnet: controlnet/
+  embeddings: embeddings/
+  upscale_models: upscale_models/
+  configs: configs/
+EOF
 fi
 
-if [ -n "${PERSIST_ROOT}" ]; then
-  # Preferred structured locations under persistent storage
-  for CAND in \
-    "${PERSIST_ROOT}/comfyui-models" \
-    "${PERSIST_ROOT}/ComfyUI/models" \
-    "${PERSIST_ROOT}/models/ComfyUI" \
-    "${PERSIST_ROOT}/ComfyUI_models" \
-    "${PERSIST_ROOT}/ComfyUI"; do
-    if [ -d "${CAND}" ]; then
-      if [ -L "${COMFYUI_MODELS_DIR}" ] || [ -d "${COMFYUI_MODELS_DIR}" ]; then
-        # Replace empty dir with symlink
-        if [ -d "${COMFYUI_MODELS_DIR}" ] && [ -z "$(ls -A "${COMFYUI_MODELS_DIR}" 2>/dev/null || true)" ]; then
-          rmdir "${COMFYUI_MODELS_DIR}" || true
-        fi
-      fi
-      if [ ! -e "${COMFYUI_MODELS_DIR}" ]; then
-        ln -s "${CAND}" "${COMFYUI_MODELS_DIR}"
-        echo "[bootstrap] Linked ComfyUI models -> ${CAND}"
-      fi
-      break
-    fi
-  done
-fi
+echo "[bootstrap] ComfyUI model paths configured"
+cat "${COMFYUI_ROOT}/extra_model_paths.yaml"
 
-echo "[bootstrap] ComfyUI root: ${COMFYUI_ROOT}"
-echo "[bootstrap] ComfyUI models: ${COMFYUI_MODELS_DIR}"
+# Start ComfyUI in background
+echo "[bootstrap] Starting ComfyUI server on ${COMFYUI_HOST}:${COMFYUI_PORT}..."
+cd "${COMFYUI_ROOT}"
+python3 main.py --listen ${COMFYUI_HOST} --port ${COMFYUI_PORT} > /tmp/comfyui.log 2>&1 &
+COMFYUI_PID=$!
+echo "[bootstrap] ComfyUI started with PID: ${COMFYUI_PID}"
+
+# Wait for ComfyUI to be ready
+echo "[bootstrap] Waiting for ComfyUI to start..."
+MAX_WAIT=60
+WAITED=0
+while [ $WAITED -lt $MAX_WAIT ]; do
+  if curl -s http://${COMFYUI_HOST}:${COMFYUI_PORT}/ > /dev/null 2>&1; then
+    echo "[bootstrap] ComfyUI is ready!"
+    break
+  fi
+  sleep 2
+  WAITED=$((WAITED + 2))
+done
+
+if [ $WAITED -ge $MAX_WAIT ]; then
+  echo "[bootstrap] WARNING: ComfyUI did not start within ${MAX_WAIT}s"
+  echo "[bootstrap] ComfyUI logs:"
+  tail -50 /tmp/comfyui.log
+fi
 
 # Start RunPod serverless worker directly (avoid python -m runpod)
+echo "[bootstrap] Starting RunPod handler..."
 export PYTHONPATH="/workspace:${PYTHONPATH:-}"
 exec python3 /workspace/src/handler.py

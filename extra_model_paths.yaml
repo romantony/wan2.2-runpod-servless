@@ -1,0 +1,74 @@
+# ComfyUI Extra Model Paths Configuration
+# This file tells ComfyUI where to find models on permanent storage
+
+# WAN 2.2 Permanent Storage Configuration
+wan2_permanent_storage:
+  # Base path where all models are stored
+  base_path: /workspace/models
+  
+  # Model directories (relative to base_path)
+  # All paths below are appended to /workspace/models/
+  
+  # Main diffusion models (WAN 2.2 I2V, S2V, Animation)
+  diffusion_models: diffusion_models/
+  
+  # Alternative diffusion model location
+  unet: unet/
+  
+  # VAE encoder/decoder models
+  vae: vae/
+  
+  # Text encoder models (UmT5-XXL)
+  text_encoders: text_encoders/
+  
+  # CLIP text encoders (alternative location)
+  clip: clip/
+  
+  # Audio encoder models (Wav2Vec2 for S2V)
+  audio_encoders: audio_encoders/
+  
+  # CLIP vision models (for I2V)
+  clip_vision: clip_vision/
+  
+  # LoRA models (LightX2V fast generation)
+  loras: loras/
+  
+  # Checkpoint models (Flux, SDXL, etc.)
+  checkpoints: checkpoints/
+  
+  # ControlNet models
+  controlnet: controlnet/
+  
+  # Text embeddings
+  embeddings: embeddings/
+  
+  # Upscale models (ESRGAN, etc.)
+  upscale_models: upscale_models/
+  
+  # Model configuration files
+  configs: configs/
+  
+  # Style models
+  style_models: style_models/
+  
+  # PhotoMaker models
+  photomaker: photomaker/
+  
+  # GLIGEN models
+  gligen: gligen/
+  
+  # Hypernetworks
+  hypernetworks: hypernetworks/
+  
+  # Diffusers models
+  diffusers: diffusers/
+  
+  # VAE approximation models
+  vae_approx: vae_approx/
+
+# Notes:
+# - This configuration points ComfyUI to permanent storage at /workspace/models/
+# - Models in this location are shared across all workers
+# - If a model exists both in built-in path and here, built-in takes priority
+# - Ensure your network volume is mounted to /workspace/models/
+# - This file should be copied to /workspace/runpod-slim/ComfyUI/extra_model_paths.yaml
